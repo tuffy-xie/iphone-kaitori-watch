@@ -6,6 +6,97 @@
 - 运行时 **零 npm 依赖**（Node 原生 TypeScript + 内置 `node:sqlite`），稳定、低成本
 - 个人使用工具：**不自动购买、不自动出售、不自动申请退货**
 
+> **✅ 部署状态：已上线运行中**（2026-10-13 完成全部验证：真实 API 采集 / D1 持久化 / Telegram 推送 / 定时任务）。日常使用方法见下方「日常使用速查」，部署过程记录见第 5 节。
+
+---
+
+## 📖 日常使用速查
+
+> 系统已部署并持续自动运行。以下是你日常唯一需要了解的操作。
+
+### 1. 你会自动收到什么（无需任何操作）
+
+| 时间（JST） | 内容 |
+|---|---|
+| 每天 09:07 | 📱 **完整早间日报**：四色最高回收价、商家、第二/第三、一丁目、与上次/今早差额、减价提示 |
+| 每天 17:07 | 📱 **完整下午日报**（格式同上） |
+| 事件发生时 | 🚨 报价涨跌超 ¥2,000 ｜ 🎉 首次现金回本 ｜ 🟡 首次综合估值回本 ｜ ⚠️ 采集失败 ｜ ℹ️ 额度保护跳过 |
+| 每天 10:00 & 22:00 | ⏳ 退货倒计时检查：剩 7/3/2/1/0 天节点提醒，最后 3 天每天提醒（不消耗買取X 额度，API 故障也保证发出） |
+
+### 2. 录入 / 修改订单（买了 iPhone 后唯一要做的操作）
+
+打开 **Actions 页面**：https://github.com/tuffy-xie/iphone-kaitori-watch/actions/workflows/monitor.yml
+
+1. 右侧 **Run workflow** 按钮
+2. `mode` 选 **`order-upsert`**
+3. `orders_json` 粘贴订单 JSON（模板见下）
+4. 点绿色 **Run workflow**
+
+```json
+[
+  {
+    "orderRef": "IP18PM-BLK-01",
+    "jan": "4549995734546",
+    "quantity": 1,
+    "unitPrice": 239800,
+    "card": "epos",
+    "purchaseDate": "2026-10-20",
+    "etaDate": "2026-10-24",
+    "receivedDate": "2026-10-24",
+    "returnDeadlineConfirmed": "2026-11-07",
+    "status": "holding",
+    "fees": { "shipping": 0, "transport": 0, "handling": 0 }
+  }
+]
+```
+
+| 字段 | 必填 | 说明 |
+|---|---|---|
+| `orderRef` | ✅ | 自定义编号；**相同编号再次提交 = 修改该订单** |
+| `jan` | ✅ | 黑 `4549995734546` / 银 `4549995734591` / 酒红 `4549995734645` / 冰川 `4549995734690` |
+| `unitPrice` | ✅ | 每台**实付金额**（默认按 Apple 官网价，可覆盖） |
+| `quantity` | | 台数，默认 1 |
+| `card` | | `epos`（EPOS黑卡）/ `ana`（ANA金卡），按实际付款卡 |
+| `receivedDate` | | 实际收货日；无官方截止日时据此 **+14 天估算**退货截止（标注"估算"） |
+| `returnDeadlineConfirmed` | | Apple 官方确认的退货截止日，**优先于估算** |
+| `returnShipDeadline` | | 退货寄出截止日（与申请截止分开跟踪） |
+| `status` | | `pending_delivery` 待到货 / `received` 已到货 / `holding` 持有观察 / `sold` 已出售 / `return_requested` 已申请退货 / `return_shipped` 已寄出退货 / `refunded` 退款完成 / `cancelled` |
+| `soldPrice` | | 实际出售价（status=sold 时填） |
+| `fees` | | 运费/交通费/手续费；**缺省 = 0（确认免运费）**；**显式 `null` = 未确认**（显示"净利润尚无法确定"） |
+| `confirmedDiscount` | | 已确认会扣减的金额（未确认的减价不要填，系统绝不自动扣） |
+
+> ⚠️ **修改订单 = 全量覆盖**：未填的字段会恢复默认值，所以修改时请把该订单的完整信息重新填一遍（可只改变化的字段，但建议全量提交）。
+
+**常见操作示例**：
+
+```jsonc
+// 收货后补录收货日（触发退货倒计时）
+[{"orderRef":"IP18PM-BLK-01","jan":"4549995734546","quantity":1,"unitPrice":239800,"card":"epos","receivedDate":"2026-10-24","status":"holding"}]
+
+// 已出售：标记状态 + 成交价
+[{"orderRef":"IP18PM-BLK-01","jan":"4549995734546","quantity":1,"unitPrice":239800,"card":"epos","receivedDate":"2026-10-24","status":"sold","soldPrice":245000}]
+
+// 已申请退货
+[{"orderRef":"IP18PM-BLK-01","jan":"4549995734546","quantity":1,"unitPrice":239800,"card":"epos","receivedDate":"2026-10-24","status":"return_requested"}]
+```
+
+### 3. 手动触发一次运行（测试 / 补数据）
+
+同一 Run workflow 页面：`mode` 选 **`monitor`**，可选 `report_type`（auto/morning/afternoon/normal）、`dry_run=true`（真实采集+打印，不推送 Telegram）。
+
+其他 mode：`verify-jan`（校验 JAN）、`notify-test`（测试消息）、`migrate`（数据库迁移）、`cleanup`（手动清理）、`return-reminder`（退货检查）。
+
+### 4. 新增监控其他型号/颜色
+
+编辑 `config/products.json` 增加一项（`model`/`capacity`/`color`/`jan`/`applePrice`）并 push，下一轮自动生效，无需改代码。免费额度 30 次/日 = 最多约 7 个 JAN × 6 轮，超出需调整轮次或升级 Premium。
+
+### 5. 查看运行历史与日志
+
+Actions 页面 → 点任意运行 → 展开步骤查看日志，关键行：
+- `[采集] 黑色 4549995734546: 26 家有效报价，最高 231000`
+- `[调度] 按时隙 JST 09:07 处理 → morning`（时区/时隙自愈状态）
+- `[完成] report=morning 采集=4 预警=1 日报=true`
+
 ---
 
 ## 1. 功能总览
@@ -80,7 +171,7 @@ DRY_RUN=true KAITORIX_MOCK=1 REPORT_TYPE=morning node src/cli.ts monitor
 
 > ⚠️ Mock 数据仅用于验证流程与排版，**不代表真实行情**。真实行情必须配置 `KAITORIX_API_KEY` 后运行 `npm run verify:jan` 确认。
 
-## 5. 部署手顺（需要你手动完成的授权操作）
+## 5. 部署手顺（✅ 已于 2026-10-13 全部完成，保留作为记录/重装指引）
 
 > **分阶段验证顺序（务必按此顺序，每阶段确认无误再进入下一阶段）：**
 > **Phase A 数据库迁移** → **Phase B 真实 API 采集验证** → **Phase C Telegram 推送测试** → **Phase D 录入订单并开启定时运行**
