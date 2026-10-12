@@ -1,0 +1,30 @@
+{
+  "timezone": "Asia/Tokyo",
+  "currency": "JPY",
+  "quota": {
+    "dailyLimit": 30,
+    "tpsMs": 1100,
+    "reserveForReports": 4
+  },
+  "reportHoursJst": {
+    "morning": 9,
+    "afternoon": 17
+  },
+  "returnReminderThresholdsDays": [7, 3, 2, 1, 0],
+  "returnDeadlineDaysAfterReceipt": 14,
+  "suggestApplyDaysBeforeDeadline": 1,
+  "priceAlertThresholdYen": 2000,
+  "rawDataRetentionDays": 29,
+  "maxQuoteAgeHours": 72,
+  "fees": {
+    "shipping": 0,
+    "transport": 0,
+    "handling": 0
+  },
+  "minProfitYen": 0,
+  "specialShops": {
+    "kaitoriIchimonme": ["買取一丁目", "ichoume"]
+  },
+  "cardsToCompare": ["epos", "ana"],
+  "telegramMaxChars": 3500
+}

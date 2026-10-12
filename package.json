@@ -1,0 +1,26 @@
+{
+  "name": "iphone-kaitori-watch",
+  "version": "1.0.0",
+  "private": true,
+  "description": "日本 iPhone 新品買取套利监控系统（GitHub Actions + Cloudflare D1 + Telegram Bot）",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "monitor": "node src/cli.ts monitor",
+    "return-reminder": "node src/cli.ts return-reminder",
+    "migrate": "node src/cli.ts migrate",
+    "verify:jan": "node src/cli.ts verify-jan",
+    "order:upsert": "node src/cli.ts order-upsert",
+    "notify:test": "node src/cli.ts notify-test",
+    "cleanup": "node src/cli.ts cleanup",
+    "dry-run": "DRY_RUN=true KAITORIX_MOCK=1 node src/cli.ts monitor",
+    "test": "node --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "typescript": "^5.9.2"
+  }
+}

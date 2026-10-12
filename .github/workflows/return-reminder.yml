@@ -1,0 +1,44 @@
+name: iphone-kaitori-watch · 退货提醒（独立）
+
+on:
+  # ┌────────────────────────────────────────────────────────────────┐
+  # │ 定时触发：完成部署 Phase A→D 全部验证后，取消下面 3 行注释即启用   │
+  # │（独立退货提醒，JST 每天 10:00/22:00，不调用買取X API）            │
+  # └────────────────────────────────────────────────────────────────┘
+  # schedule:
+  #   - cron: '0 1,13 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '演练模式（Telegram 消息只打印不发送）'
+        type: boolean
+        default: false
+
+# 与监控工作流共用同一并发组：串行执行，避免两个工作流同时写入通知去重表
+concurrency:
+  group: iphone-kaitori-watch
+  cancel-in-progress: false
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 退货倒计时检查与提醒
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          DRY_RUN: ${{ (inputs.dry_run && 'true') || 'false' }}
+        run: npm run return-reminder

@@ -1,0 +1,80 @@
+name: iphone-kaitori-watch · 监控
+
+on:
+  # ┌────────────────────────────────────────────────────────────────┐
+  # │ 定时触发：完成部署 Phase A→D 全部验证后，取消下面 4 行注释即启用   │
+  # │ （日本时间每天 6 次：09:07/12:07/15:07/17:07/20:07/23:07）        │
+  # └────────────────────────────────────────────────────────────────┘
+  # schedule:
+  #   - cron: '7 9,12,15,17,20,23 * * *'
+  #     timezone: Asia/Tokyo
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '运行模式'
+        type: choice
+        options: [monitor, return-reminder, migrate, verify-jan, notify-test, cleanup, order-upsert]
+        default: monitor
+      dry_run:
+        description: '演练模式（Telegram 消息只打印不发送，不写入去重状态）'
+        type: boolean
+        default: false
+      report_type:
+        description: '报告类型（auto = 定时任务按应属时隙自动判断）'
+        type: choice
+        options: [auto, morning, afternoon, normal]
+        default: auto
+      orders_json:
+        description: 'order-upsert 模式专用：订单 JSON 数组（见 README「订单录入」）'
+        type: string
+        default: ''
+
+# 与退货提醒工作流共用同一并发组：两个工作流串行执行，避免通知去重的检查-写入竞争
+concurrency:
+  group: iphone-kaitori-watch
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: 安装依赖（仅 typescript，运行时零依赖）
+        run: npm ci
+
+      - name: 类型检查
+        run: npm run typecheck
+
+      - name: 运行 ${{ inputs.mode || 'monitor' }}
+        env:
+          KAITORIX_API_KEY: ${{ secrets.KAITORIX_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+          DRY_RUN: ${{ (inputs.dry_run && 'true') || 'false' }}
+          REPORT_TYPE: ${{ inputs.report_type || 'auto' }}
+          ORDERS_JSON: ${{ inputs.orders_json }}
+          # 定时触发的 cron 表达式（workflow_dispatch 时为空）与时区
+          SCHEDULE_CRON: ${{ github.event.schedule }}
+          SCHEDULE_TZ: Asia/Tokyo
+        run: |
+          MODE="${{ inputs.mode || 'monitor' }}"
+          echo "::notice::mode=$MODE dry_run=$DRY_RUN report_type=$REPORT_TYPE schedule=$SCHEDULE_CRON tz=$SCHEDULE_TZ"
+          case "$MODE" in
+            monitor)          npm run monitor ;;
+            return-reminder)  npm run return-reminder ;;
+            migrate)          npm run migrate ;;
+            verify-jan)       npm run verify:jan ;;
+            notify-test)      npm run notify:test ;;
+            cleanup)          npm run cleanup ;;
+            order-upsert)     npm run order:upsert ;;
+            *) echo "未知模式: $MODE"; exit 1 ;;
+          esac

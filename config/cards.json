@@ -1,0 +1,24 @@
+{
+  "cards": {
+    "epos": {
+      "type": "epos_platinum",
+      "label": "EPOS Platinum（EPOS黑卡）",
+      "yenPerPointUnit": 200,
+      "pointsPerUnit": 1,
+      "yenPerPoint": 1,
+      "annualBonus": {
+        "enabled": false,
+        "ytdSpend": 0,
+        "tiers": []
+      }
+    },
+    "ana": {
+      "type": "ana_gold",
+      "label": "ANA To Me CARD PASMO JCB GOLD（ANA金卡）",
+      "yenPerPointUnit": 200,
+      "pointsPerUnit": 1,
+      "jpointToMiles": 2,
+      "yenPerMile": 2
+    }
+  }
+}

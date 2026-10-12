@@ -1,0 +1,48 @@
+{
+  "products": [
+    {
+      "id": "ip18pm-256-black",
+      "model": "iPhone 18 Pro Max",
+      "capacity": "256GB",
+      "color": "ブラック",
+      "colorZh": "黑色",
+      "jan": "4549995734546",
+      "part": "MJX54J/A",
+      "applePrice": 239800,
+      "active": true
+    },
+    {
+      "id": "ip18pm-256-silver",
+      "model": "iPhone 18 Pro Max",
+      "capacity": "256GB",
+      "color": "シルバー",
+      "colorZh": "银色",
+      "jan": "4549995734591",
+      "part": "MJX64J/A",
+      "applePrice": 239800,
+      "active": true
+    },
+    {
+      "id": "ip18pm-256-burgundy",
+      "model": "iPhone 18 Pro Max",
+      "capacity": "256GB",
+      "color": "バーガンディ",
+      "colorZh": "酒红色",
+      "jan": "4549995734645",
+      "part": "MJX74J/A",
+      "applePrice": 239800,
+      "active": true
+    },
+    {
+      "id": "ip18pm-256-glacier",
+      "model": "iPhone 18 Pro Max",
+      "capacity": "256GB",
+      "color": "グレイシャー",
+      "colorZh": "冰川色",
+      "jan": "4549995734690",
+      "part": "MJX84J/A",
+      "applePrice": 239800,
+      "active": true
+    }
+  ]
+}
