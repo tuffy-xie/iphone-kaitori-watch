@@ -93,10 +93,13 @@ function makeItem(order: OrderRecord, bestPrice: number): ProductReportItem {
   const analyses: OrderAnalysis[] = [
     { order, product, profit, deadline: null, daysLeft: 10, suggestApplyDate: null, suggestion },
   ];
+  const ichimonme = filtered.ichimonme ?? filtered.best;
   return {
     product,
     latest: { runId: 'r', fetchedAt: '2026-10-12T00:07:00.000+09:00', quotes },
     filtered,
+    focusQuote: ichimonme,
+    focusIsIchimonme: filtered.ichimonme !== null,
     prevBest: null,
     morningBest: null,
     best24hAgo: null,

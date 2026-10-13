@@ -17,6 +17,7 @@ const DEFAULTS: Settings = {
   fees: { shipping: 0, transport: 0, handling: 0 },
   minProfitYen: 0,
   specialShops: { kaitoriIchimonme: ['買取一丁目', 'ichoume'] },
+  focusShopOnly: true,
   cardsToCompare: ['epos', 'ana'],
   telegramMaxChars: 3500,
 };

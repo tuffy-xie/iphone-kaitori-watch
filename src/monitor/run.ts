@@ -153,16 +153,18 @@ export async function runMonitor(
         const fetchedAt = isoNowJst(now);
         await repo.insertSnapshot(db, { runId, jan, fetchedAt, payload: res.body });
         await repo.insertQuotes(db, { runId, jan, fetchedAt, quotes: parsed.quotes, filtered });
-        if (filtered.best) {
+        if (filtered.best || filtered.ichimonme) {
           const existing = await repo.getDailyBest(db, today, jan);
           await repo.upsertDailyBest(db, {
             date: today,
             jan,
-            bestPrice: filtered.best.price,
-            bestShop: filtered.best.shopName,
-            bestShopKey: filtered.best.shopKey,
-            morningPrice: existing?.morning_price ?? filtered.best.price,
+            bestPrice: filtered.best?.price ?? 0,
+            bestShop: filtered.best?.shopName ?? '',
+            bestShopKey: filtered.best?.shopKey ?? '',
+            morningPrice: existing?.morning_price ?? filtered.best?.price ?? null,
             shopCount: filtered.valid.length,
+            ichimonmePrice: filtered.ichimonme?.price ?? null,
+            ichimonmeMorningPrice: existing?.ichimonme_morning_price ?? filtered.ichimonme?.price ?? null,
           });
         }
         fetched.push(jan);
@@ -191,6 +193,8 @@ export async function runMonitor(
   }
 
   // ---------- 分析 ----------
+  // 报价基准：focusShopOnly=true 时统一以買取一丁目为基准（报告与订单判定一致）；
+  // 一丁目暂无有效报价时回退为全店最高价，并在报告中显示实际店名。
   const orders = await repo.listHeldOrders(db);
   const items: ProductReportItem[] = [];
   const alerts: { key: string; text: string }[] = [];
@@ -198,12 +202,23 @@ export async function runMonitor(
 
   for (const p of active) {
     const latest = await repo.getLatestValidQuotes(db, p.jan);
-    const filtered = latest ? filterAndRank(latest.quotes, { maxQuoteAgeHours: settings.maxQuoteAgeHours, now, specialShopKeys: settings.specialShops.kaitoriIchimonme }) : EMPTY_FILTER;
-    const prevBest = latest ? await repo.getPreviousValidBest(db, p.jan, latest.fetchedAt) : null;
+    const filtered = latest
+      ? filterAndRank(latest.quotes, { maxQuoteAgeHours: settings.maxQuoteAgeHours, now, specialShopKeys: settings.specialShops.kaitoriIchimonme })
+      : EMPTY_FILTER;
+    const focusQuote = settings.focusShopOnly ? (filtered.ichimonme ?? filtered.best) : filtered.best;
+    const refPrice = focusQuote?.price ?? null;
+    const refShopName = focusQuote?.shopName ?? null;
+    const refIsIchimonme = settings.focusShopOnly && filtered.ichimonme !== null && focusQuote?.shopKey === filtered.ichimonme?.shopKey;
+    const prevRef = latest
+      ? settings.focusShopOnly
+        ? await repo.getPreviousIchimonmeBest(db, p.jan, latest.fetchedAt)
+        : await repo.getPreviousValidBest(db, p.jan, latest.fetchedAt)
+      : null;
     const daily = await repo.getDailyBest(db, today, p.jan);
-    const morningBest = daily?.morning_price ?? null;
+    const morningRef = settings.focusShopOnly ? (daily?.ichimonme_morning_price ?? null) : (daily?.morning_price ?? null);
     const best24hAgo = latest ? await repo.getBestAround24hAgo(db, p.jan, isoNowJst(now)) : null;
     const dataAgeHours = latest ? (now.getTime() - new Date(latest.fetchedAt).getTime()) / 3600000 : null;
+    const priceLabel = settings.focusShopOnly ? '一丁目回收' : '最高回收';
 
     const analyses: OrderAnalysis[] = [];
     for (const o of orders.filter((o) => o.jan === p.jan)) {
@@ -211,7 +226,7 @@ export async function runMonitor(
       const profit = computeProfit({
         unitPrice: o.unitPrice,
         quantity: o.quantity,
-        bestPrice: filtered.best?.price ?? null,
+        bestPrice: refPrice,
         // 订单费用在录入时已解析：NULL = 未确认（显示"尚无法确定"），不再回退默认值
         fees: {
           shipping: o.fees?.shipping ?? null,
@@ -227,7 +242,8 @@ export async function runMonitor(
         profit,
         daysLeft: cd.daysLeft,
         minProfitYen: settings.minProfitYen,
-        discountUnknown: filtered.colorDiscount !== null,
+        // 聚焦模式下减价提示只看一丁目的 mark_note
+        discountUnknown: settings.focusShopOnly ? (focusQuote?.discountAmount ?? null) !== null : filtered.colorDiscount !== null,
         quoteNotLocked: true,
       });
       analyses.push({
@@ -240,51 +256,64 @@ export async function runMonitor(
         suggestion,
       });
 
-      const best = filtered.best;
-      if (best && prevBest !== null) {
-        const diff = best.price - prevBest;
+      if (refPrice !== null && prevRef !== null) {
+        const diff = refPrice - prevRef;
         if (Math.abs(diff) >= settings.priceAlertThresholdYen) {
           alerts.push({
             key: `price-${diff > 0 ? 'up' : 'down'}-${p.jan}-${today}`,
             text: msg.buildPriceAlert({
               product: p,
               direction: diff > 0 ? 'up' : 'down',
-              current: best.price,
-              previous: prevBest,
-              shopName: best.shopName,
-              updatedAt: best.updatedAt,
+              current: refPrice,
+              previous: prevRef,
+              shopName: refShopName ?? '',
+              updatedAt: focusQuote?.updatedAt ?? null,
+              priceLabel,
             }),
           });
         }
       }
-      if (best && profit.cashBreakEvenPrice !== null && best.price >= profit.cashBreakEvenPrice) {
+      if (refPrice !== null && profit.cashBreakEvenPrice !== null && refPrice >= profit.cashBreakEvenPrice) {
         alerts.push({
           key: `first-cashbe-${o.orderRef}`,
           text: msg.buildBreakEvenAlert({
             order: o,
             product: p,
             kind: 'cash',
-            bestPrice: best.price,
+            bestPrice: refPrice,
             breakEvenPrice: profit.cashBreakEvenPrice,
-            shopName: best.shopName,
+            shopName: refShopName ?? '',
+            priceLabel,
           }),
         });
-      } else if (best && profit.comprehensiveBreakEvenPrice !== null && best.price >= profit.comprehensiveBreakEvenPrice) {
+      } else if (refPrice !== null && profit.comprehensiveBreakEvenPrice !== null && refPrice >= profit.comprehensiveBreakEvenPrice) {
         alerts.push({
           key: `first-compbe-${o.orderRef}`,
           text: msg.buildBreakEvenAlert({
             order: o,
             product: p,
             kind: 'comprehensive',
-            bestPrice: best.price,
+            bestPrice: refPrice,
             breakEvenPrice: profit.comprehensiveBreakEvenPrice,
-            shopName: best.shopName,
+            shopName: refShopName ?? '',
+            priceLabel,
           }),
         });
       }
     }
 
-    items.push({ product: p, latest, filtered, prevBest, morningBest, best24hAgo, analyses, dataAgeHours });
+    items.push({
+      product: p,
+      latest,
+      filtered,
+      focusQuote,
+      focusIsIchimonme: refIsIchimonme,
+      prevBest: prevRef,
+      morningBest: morningRef,
+      best24hAgo,
+      analyses,
+      dataAgeHours,
+    });
   }
 
   // ---------- 退货提醒（与独立提醒工作流共用事件键，DB 去重） ----------
@@ -309,6 +338,7 @@ export async function runMonitor(
       items,
       cards,
       settings,
+      focusMode: settings.focusShopOnly,
       quotaNote: skipped.some((s) => s.reason.includes('额度')) ? msg.buildQuotaSkipNote(skipped.find((s) => s.reason.includes('额度'))!.reason) : null,
       extraWarnings: [...new Set(fetchWarnings)],
     });

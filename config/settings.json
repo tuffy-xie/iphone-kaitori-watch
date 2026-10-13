@@ -25,6 +25,7 @@
   "specialShops": {
     "kaitoriIchimonme": ["買取一丁目", "ichoume"]
   },
+  "focusShopOnly": true,
   "cardsToCompare": ["epos", "ana"],
   "telegramMaxChars": 3500
 }

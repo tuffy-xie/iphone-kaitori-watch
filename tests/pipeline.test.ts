@@ -78,16 +78,17 @@ test('端到端：早间监控全流程（Mock 数据）', async () => {
   assert.equal(runlog[0].status, 'ok');
 
   // --- 日报与预警内容 ---
-  assert.match(out, /早间报告/);
-  assert.match(out, /⚫ 黑色 ¥231,000（買取ソムリエ）/);
-  assert.match(out, /毛差 -¥8,800｜净利 -¥8,800｜积分估值 \+¥1,199｜综合 -¥7,601｜实际确认 -¥8,800/);
+  assert.match(out, /早报/);
+  assert.match(out, /⚫ 黑色 ¥228,000｜毛差 -¥11,800/);
+  assert.match(out, /🧾 IP18PM-BLK-01 ×1 EPOS黑卡｜购买¥239,800｜毛差 -¥11,800｜净利 -¥11,800｜积分估值 \+¥1,199｜综合 -¥10,601｜实际确认 -¥11,800/);
   assert.match(out, /⏳ 退货倒计时/);
   assert.match(out, /IP18PM-BLK-01/);
   assert.match(out, /截止 10月18日（估算）/);
   assert.match(out, /IP18PM-GLC-01/);
   assert.match(out, /截止 10月19日（官方）/);
   // 冰川色 241000 ≥ 239800 → 首次现金回本预警
-  assert.match(out, /🎉 首次现金回本/);
+  assert.match(out, /🟡 首次综合估值回本/);
+  assert.doesNotMatch(out, /🎉 首次现金回本/, '一丁目价未达现金回本，不得报现金回本');
   // 7 天阈值退货提醒（黑色剩 6 天、冰川剩 7 天）
   assert.match(out, /退货倒计时提醒/);
   assert.ok(!out.includes('NaN'));
@@ -203,6 +204,6 @@ test('mock 模式下 runMonitor 也能只读库中数据出报告（无 client�
     assert.equal(r.fetched.length, 0);
     assert.equal(r.reportSent, true);
   });
-  assert.match(out, /下午报告/);
-  assert.match(out, /⚫ 黑色 ¥231,000（買取ソムリエ）/, '使用库中最近有效报价');
+  assert.match(out, /下午报/);
+  assert.match(out, /⚫ 黑色 ¥228,000｜毛差 -¥11,800/, '使用库中最近有效报价');
 });

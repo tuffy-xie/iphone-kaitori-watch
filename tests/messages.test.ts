@@ -34,13 +34,22 @@ function makeItem(): ProductReportItem {
   const analyses: OrderAnalysis[] = [
     { order: order as never, product, profit, deadline: { date: '2026-10-18', estimated: true, source: 'estimated' }, daysLeft: 6, suggestApplyDate: '2026-10-17', suggestion },
   ];
+  const ichimonme = filtered.ichimonme ?? filtered.best;
   return {
-    product, latest: { runId: 'r', fetchedAt: '2026-10-12T00:07:00.000+09:00', quotes },
-    filtered, prevBest: 227000, morningBest: 230000, best24hAgo: 229000, analyses, dataAgeHours: 0.1,
+    product,
+    latest: { runId: 'r', fetchedAt: '2026-10-12T00:07:00.000+09:00', quotes },
+    filtered,
+    focusQuote: ichimonme,
+    focusIsIchimonme: filtered.ichimonme !== null,
+    prevBest: 227000,
+    morningBest: 230000,
+    best24hAgo: 229000,
+    analyses,
+    dataAgeHours: 0.1,
   };
 }
 
-test('日报包含所有必需区块（紧凑格式）', () => {
+test('全店模式（focusShopOnly=false）：每色 2 行含排名与估算', () => {
   const messages = buildDailyReport({
     now: new Date('2026-10-12T09:05:00+09:00'),
     reportType: 'morning',
@@ -75,6 +84,71 @@ test('日报包含所有必需区块（紧凑格式）', () => {
   assert.ok(!text.includes('NaN'), '不得出现 NaN');
   // 紧凑性：整个报告应控制在一屏以内
   assert.ok(text.length < 1200, `报告过长: ${text.length} 字符`);
+});
+
+test('聚焦模式（默认 focusShopOnly=true）：每色一行只展示一丁目', () => {
+  const item = makeItem();
+  item.analyses = [];
+  const messages = buildDailyReport({
+    now: new Date('2026-10-12T09:05:00+09:00'),
+    reportType: 'morning',
+    items: [item],
+    cards,
+    settings,
+    quotaNote: null,
+    extraWarnings: [],
+    focusMode: true,
+  });
+  const text = messages.join('\n');
+  // 头部用"早报"；一丁目 225000，毛差 -14800，较上次 227000 → ↓2,000
+  assert.match(text, /📱 買取监控·早报｜🕒 2026\/10\/12 09:05 JST/);
+  assert.match(text, /⚫ 黑色 ¥225,000｜毛差 -¥14,800｜↓2,000/);
+  // 聚焦模式不出现其他商家与排名
+  assert.doesNotMatch(text, /買取ソムリエ/);
+  assert.doesNotMatch(text, /第二/);
+  assert.doesNotMatch(text, /EPOS\+/);
+  // 页脚：一丁目 + 报价更新时间 + 查询时间
+  assert.match(text, /🔗 買取一丁目 10\/12 08:40更新｜2026\/10\/12 09:05 JST 查询/);
+  // 一屏可读
+  assert.ok(text.length < 600, `聚焦报告过长: ${text.length} 字符`);
+});
+
+test('聚焦模式：一丁目暂无报价时回退全店最高并显示店名', () => {
+  const item = makeItem();
+  item.analyses = [];
+  item.focusQuote = item.filtered.best;   // 回退到最高价店
+  item.focusIsIchimonme = false;
+  const messages = buildDailyReport({
+    now: new Date('2026-10-12T09:05:00+09:00'),
+    reportType: 'morning',
+    items: [item],
+    cards,
+    settings,
+    quotaNote: null,
+    extraWarnings: [],
+    focusMode: true,
+  });
+  const text = messages.join('\n');
+  assert.match(text, /⚫ 黑色 ¥231,000（買取ソムリエ）｜毛差 -¥8,800/);
+});
+
+test('聚焦模式：一丁目减价提示触发未确认警示', () => {
+  const item = makeItem();
+  item.analyses = [];
+  // 给一丁目报价加上减价注记
+  item.focusQuote = { ...item.focusQuote!, discountAmount: 15000, discountNote: 'キャンペーン: ブラック -15,000' };
+  const messages = buildDailyReport({
+    now: new Date('2026-10-12T09:05:00+09:00'),
+    reportType: 'morning',
+    items: [item],
+    cards,
+    settings,
+    quotaNote: null,
+    extraWarnings: [],
+    focusMode: true,
+  });
+  const text = messages.join('\n');
+  assert.match(text, /⚠️减价 -¥15,000未确认/);
 });
 
 test('无订单时产品级展示 EPOS/ANA 积分里程估算', () => {

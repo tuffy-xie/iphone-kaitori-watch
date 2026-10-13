@@ -241,6 +241,17 @@ export async function getPreviousValidBest(db: Db, jan: string, beforeFetchedAt:
   return rows[0]?.best ?? null;
 }
 
+/** 上一次（早于给定时间）買取一丁目的有效报价 */
+export async function getPreviousIchimonmeBest(db: Db, jan: string, beforeFetchedAt: string): Promise<number | null> {
+  const rows = await db.query<{ best: number | null }>(
+    `SELECT MAX(price) AS best FROM quotes
+     WHERE jan = ? AND is_ichimonme = 1 AND stopped = 0 AND stale = 0
+       AND fetched_at = (SELECT MAX(fetched_at) FROM quotes WHERE jan = ? AND is_ichimonme = 1 AND stopped = 0 AND stale = 0 AND fetched_at < ?)`,
+    [jan, jan, beforeFetchedAt],
+  );
+  return rows[0]?.best ?? null;
+}
+
 /** 约 24 小时前的有效最高报价（窗口 now-30h ~ now-24h） */
 export async function getBestAround24hAgo(db: Db, jan: string, nowIso: string): Promise<number | null> {
   const now = new Date(nowIso).getTime();
@@ -259,22 +270,43 @@ export async function getBestAround24hAgo(db: Db, jan: string, nowIso: string): 
 
 export async function upsertDailyBest(
   db: Db,
-  args: { date: string; jan: string; bestPrice: number; bestShop: string; bestShopKey: string; morningPrice: number | null; shopCount: number },
+  args: {
+    date: string;
+    jan: string;
+    bestPrice: number;
+    bestShop: string;
+    bestShopKey: string;
+    morningPrice: number | null;
+    shopCount: number;
+    ichimonmePrice?: number | null;
+    ichimonmeMorningPrice?: number | null;
+  },
 ): Promise<void> {
   await db.run(
-    `INSERT INTO daily_best (date, jan, best_price, best_shop, best_shop_key, morning_price, shop_count, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `INSERT INTO daily_best (date, jan, best_price, best_shop, best_shop_key, morning_price, shop_count,
+                             ichimonme_price, ichimonme_morning_price, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
      ON CONFLICT(date, jan) DO UPDATE SET
        best_price = excluded.best_price, best_shop = excluded.best_shop, best_shop_key = excluded.best_shop_key,
        morning_price = COALESCE(daily_best.morning_price, excluded.morning_price),
-       shop_count = excluded.shop_count, updated_at = datetime('now')`,
-    [args.date, args.jan, args.bestPrice, args.bestShop, args.bestShopKey, args.morningPrice, args.shopCount],
+       shop_count = excluded.shop_count,
+       ichimonme_price = excluded.ichimonme_price,
+       ichimonme_morning_price = COALESCE(daily_best.ichimonme_morning_price, excluded.ichimonme_morning_price),
+       updated_at = datetime('now')`,
+    [
+      args.date, args.jan, args.bestPrice, args.bestShop, args.bestShopKey, args.morningPrice, args.shopCount,
+      args.ichimonmePrice ?? null, args.ichimonmeMorningPrice ?? null,
+    ],
   );
 }
 
-export async function getDailyBest(db: Db, date: string, jan: string): Promise<{ best_price: number; morning_price: number | null } | null> {
-  const rows = await db.query<{ best_price: number; morning_price: number | null }>(
-    'SELECT best_price, morning_price FROM daily_best WHERE date = ? AND jan = ?',
+export async function getDailyBest(
+  db: Db,
+  date: string,
+  jan: string,
+): Promise<{ best_price: number; morning_price: number | null; ichimonme_price: number | null; ichimonme_morning_price: number | null } | null> {
+  const rows = await db.query<{ best_price: number; morning_price: number | null; ichimonme_price: number | null; ichimonme_morning_price: number | null }>(
+    'SELECT best_price, morning_price, ichimonme_price, ichimonme_morning_price FROM daily_best WHERE date = ? AND jan = ?',
     [date, jan],
   );
   return rows[0] ?? null;

@@ -72,6 +72,8 @@ export interface Settings {
   fees: { shipping: number | null; transport: number | null; handling: number | null };
   minProfitYen: number;
   specialShops: { kaitoriIchimonme: string[] };
+  /** true = 只以買取一丁目为报价基准（报告与订单判定一致）；false = 全店最高价模式 */
+  focusShopOnly: boolean;
   cardsToCompare: CardId[];
   telegramMaxChars: number;
 }
