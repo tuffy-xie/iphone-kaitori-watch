@@ -58,10 +58,10 @@ test('日报包含所有必需区块（紧凑格式）', () => {
   assert.match(text, /⚫ 黑色 ¥231,000（買取ソムリエ）/);
   assert.match(text, /第二 ¥229,500｜第三 ¥225,000｜一丁目 ¥225,000/);
   assert.match(text, /较上次 \+¥4,000｜较今早 \+¥1,000/);
-  assert.match(text, /⚠️减价 -¥17,500 未确认（保守 ¥213,500）｜报价 10\/12 08:50/);
+  assert.match(text, /⚠️减价 -¥17,500未确认（保守¥213,500）｜报价 10\/12 08:50/);
   // 订单区：五口径一行
-  assert.match(text, /🧾 IP18PM-BLK-01 ×1 EPOS黑卡｜购买 ¥239,800/);
-  assert.match(text, /毛差 -¥8,800｜预计净利 -¥8,800｜积分估值 \+¥1,199｜综合 -¥7,601｜实际确认 -¥8,800/);
+  assert.match(text, /🧾 IP18PM-BLK-01 ×1 EPOS黑卡｜购买¥239,800/);
+  assert.match(text, /毛差 -¥8,800｜净利 -¥8,800｜积分估值 \+¥1,199｜综合 -¥7,601｜实际确认 -¥8,800/);
   // 退货倒计时：一行
   assert.match(text, /⏳ 退货倒计时/);
   assert.match(text, /🧾 IP18PM-BLK-01 ⚫黑色×1｜截止 10月18日（估算）｜最迟申请 10月17日｜剩 6 天/);
@@ -90,7 +90,8 @@ test('无订单时产品级展示 EPOS/ANA 积分里程估算', () => {
     extraWarnings: [],
   });
   const text = messages.join('\n');
-  assert.match(text, /毛差 -¥8,800｜EPOS \+¥1,199｜ANA里程 ≈¥4,796/);
+  assert.match(text, /⚫ 黑色 ¥231,000（買取ソムリエ）｜第二 ¥229,500｜第三 ¥225,000｜一丁目 ¥225,000｜毛差 -¥8,800/);
+  assert.match(text, /EPOS\+¥1,199｜ANA≈¥4,796｜较上次 \+¥4,000｜较今早 \+¥1,000/);
   assert.doesNotMatch(text, /🧾/, '无订单不显示订单区');
 });
 

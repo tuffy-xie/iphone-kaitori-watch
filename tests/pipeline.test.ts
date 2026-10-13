@@ -80,7 +80,7 @@ test('端到端：早间监控全流程（Mock 数据）', async () => {
   // --- 日报与预警内容 ---
   assert.match(out, /早间报告/);
   assert.match(out, /⚫ 黑色 ¥231,000（買取ソムリエ）/);
-  assert.match(out, /毛差 -¥8,800｜预计净利 -¥8,800｜积分估值 \+¥1,199｜综合 -¥7,601｜实际确认 -¥8,800/);
+  assert.match(out, /毛差 -¥8,800｜净利 -¥8,800｜积分估值 \+¥1,199｜综合 -¥7,601｜实际确认 -¥8,800/);
   assert.match(out, /⏳ 退货倒计时/);
   assert.match(out, /IP18PM-BLK-01/);
   assert.match(out, /截止 10月18日（估算）/);

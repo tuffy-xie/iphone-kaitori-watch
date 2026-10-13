@@ -74,7 +74,7 @@ function cardShortLabel(card: CardConfig | undefined): string {
   return card.type === 'epos_platinum' ? 'EPOS黑卡' : 'ANA金卡';
 }
 
-/** 单色紧凑区块：4 行（无订单）/ +2 行每个订单 */
+/** 单色超紧凑区块：2 行（无订单）/ +1 行每个订单 */
 function productBlock(item: ProductReportItem, cards: Record<CardId, CardConfig>): string {
   const p = item.product;
   const f = item.filtered;
@@ -85,42 +85,45 @@ function productBlock(item: ProductReportItem, cards: Record<CardId, CardConfig>
   const best = f.best.price;
   const apple = p.applePrice;
   const lines: string[] = [];
-  lines.push(`${emoji} ${p.colorZh} ${yen(best)}（${f.best.shopName}）`);
-  const rank: string[] = [];
-  if (f.second) rank.push(`第二 ${yen(f.second.price)}`);
-  if (f.third) rank.push(`第三 ${yen(f.third.price)}`);
-  if (f.ichimonme) rank.push(`一丁目 ${yen(f.ichimonme.price)}`);
-  lines.push(`  ${rank.join('｜')}`);
 
-  // 无订单时展示两种卡的积分/里程估算（复用 calcCard，逻辑与订单区一致）
+  // 第 1 行：最高价+商家+排名+毛差
+  const l1: string[] = [`${emoji} ${p.colorZh} ${yen(best)}（${f.best.shopName}）`];
+  if (f.second) l1.push(`第二 ${yen(f.second.price)}`);
+  if (f.third) l1.push(`第三 ${yen(f.third.price)}`);
+  if (f.ichimonme) l1.push(`一丁目 ${yen(f.ichimonme.price)}`);
+  l1.push(`毛差 ${yenSigned(best - apple)}`);
+  lines.push(l1.join('｜'));
+
+  // 第 2 行：积分估算（无订单时）+ 差额 + 减价 + 报价时间
+  const l2: string[] = [];
   if (item.analyses.length === 0) {
     const eposR = calcCard(apple, cards.epos);
     const anaR = calcCard(apple, cards.ana);
-    lines.push(`  毛差 ${yenSigned(best - apple)}｜EPOS +${yen(eposR.pointsValueYen)}｜ANA里程 ≈${yen(anaR.milesValueYen)}`);
+    l2.push(`EPOS+${yen(eposR.pointsValueYen)}`, `ANA≈${yen(anaR.milesValueYen)}`);
   }
-  lines.push(`  较上次 ${diffText(best, item.prevBest)}｜较今早 ${diffText(best, item.morningBest)}`);
-  const tail: string[] = [];
+  l2.push(`较上次 ${diffText(best, item.prevBest)}`, `较今早 ${diffText(best, item.morningBest)}`);
   if (f.colorDiscount) {
-    tail.push(`⚠️减价 ${yenSigned(-f.colorDiscount.amount)} 未确认（保守 ${yen(best - f.colorDiscount.amount)}）`);
+    l2.push(`⚠️减价 ${yenSigned(-f.colorDiscount.amount)}未确认（保守${yen(best - f.colorDiscount.amount)}）`);
   }
-  tail.push(`报价 ${formatIsoShort(f.best.updatedAt)}`);
-  lines.push(`  ${tail.join('｜')}`);
+  l2.push(`报价 ${formatIsoShort(f.best.updatedAt)}`);
+  lines.push(`  ${l2.join('｜')}`);
 
+  // 订单：一行五口径
   for (const a of item.analyses) {
     const pr = a.profit;
     const cardName = cardShortLabel(cards[a.order.card]);
     const reversed = pr.card.notes.some((n) => n.includes('撤销'));
-    lines.push(`🧾 ${a.order.orderRef} ×${a.order.quantity} ${cardName}｜购买 ${yen(a.order.unitPrice)}`);
+    const head = `🧾 ${a.order.orderRef} ×${a.order.quantity} ${cardName}｜购买${yen(a.order.unitPrice)}`;
     if (!pr.feesKnown) {
-      lines.push(`  毛差 ${yenSigned(pr.cashGrossPerUnit)}｜预计净利 未确认｜综合 未估算｜实际确认 暂无 ⚠️费用未确认`);
+      lines.push(`${head}｜毛差 ${yenSigned(pr.cashGrossPerUnit)}｜净利未确认｜综合未估算｜确认暂无 ⚠️费用未确认`);
     } else if (reversed) {
       lines.push(
-        `  毛差 ${yenSigned(pr.cashGrossPerUnit)}｜预计净利 ${yenSigned(pr.cashNetPerUnit)}｜积分估值 ¥0（已申请退货）｜综合 ${yenSigned(pr.comprehensiveNetPerUnit)}｜实际确认 ${yenSigned(pr.cashNetPerUnit)}`,
+        `${head}｜毛差 ${yenSigned(pr.cashGrossPerUnit)}｜净利 ${yenSigned(pr.cashNetPerUnit)}｜积分估值 ¥0（已申请退货）｜综合 ${yenSigned(pr.comprehensiveNetPerUnit)}｜实际确认 ${yenSigned(pr.cashNetPerUnit)}`,
       );
     } else {
       const pts = pr.pointsValuePerUnit + pr.milesValuePerUnit;
       lines.push(
-        `  毛差 ${yenSigned(pr.cashGrossPerUnit)}｜预计净利 ${yenSigned(pr.cashNetPerUnit)}｜积分估值 +${yen(pts)}｜综合 ${yenSigned(pr.comprehensiveNetPerUnit)}｜实际确认 ${yenSigned(pr.cashNetPerUnit)}`,
+        `${head}｜毛差 ${yenSigned(pr.cashGrossPerUnit)}｜净利 ${yenSigned(pr.cashNetPerUnit)}｜积分估值 +${yen(pts)}｜综合 ${yenSigned(pr.comprehensiveNetPerUnit)}｜实际确认 ${yenSigned(pr.cashNetPerUnit)}`,
       );
     }
   }
