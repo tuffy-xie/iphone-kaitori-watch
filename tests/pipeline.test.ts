@@ -79,13 +79,13 @@ test('端到端：早间监控全流程（Mock 数据）', async () => {
 
   // --- 日报与预警内容 ---
   assert.match(out, /早间报告/);
-  assert.match(out, /最高回收：¥231,000/);
-  assert.match(out, /商家：買取ソムリエ/);
+  assert.match(out, /⚫ 黑色 ¥231,000（買取ソムリエ）/);
+  assert.match(out, /毛差 -¥8,800｜预计净利 -¥8,800｜积分估值 \+¥1,199｜综合 -¥7,601｜实际确认 -¥8,800/);
   assert.match(out, /⏳ 退货倒计时/);
   assert.match(out, /IP18PM-BLK-01/);
-  assert.match(out, /10月18日（估算：收货\+14天）/);
+  assert.match(out, /截止 10月18日（估算）/);
   assert.match(out, /IP18PM-GLC-01/);
-  assert.match(out, /10月19日（官方确认）/);
+  assert.match(out, /截止 10月19日（官方）/);
   // 冰川色 241000 ≥ 239800 → 首次现金回本预警
   assert.match(out, /🎉 首次现金回本/);
   // 7 天阈值退货提醒（黑色剩 6 天、冰川剩 7 天）
@@ -204,5 +204,5 @@ test('mock 模式下 runMonitor 也能只读库中数据出报告（无 client�
     assert.equal(r.reportSent, true);
   });
   assert.match(out, /下午报告/);
-  assert.match(out, /最高回收：¥231,000/, '使用库中最近有效报价');
+  assert.match(out, /⚫ 黑色 ¥231,000（買取ソムリエ）/, '使用库中最近有效报价');
 });

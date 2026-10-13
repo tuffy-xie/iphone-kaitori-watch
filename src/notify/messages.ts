@@ -2,6 +2,7 @@
 
 import type { CardConfig, CardId, OrderRecord, ProductConfig, QuoteFilterResult, Settings } from '../types.ts';
 import type { ProfitResult } from '../analysis/profit.ts';
+import { calcCard } from '../analysis/cards.ts';
 import type { LatestQuotes } from '../db/repo.ts';
 import type { DeadlineInfo } from '../orders/return.ts';
 import { formatDateCn, formatIsoShort, formatJstDateTime, jstParts } from '../util/time.ts';
@@ -68,72 +69,60 @@ function quoteLine(q: { shopName: string; price: number } | null): string {
   return q ? `${yen(q.price)}（${q.shopName}）` : '—';
 }
 
+function cardShortLabel(card: CardConfig | undefined): string {
+  if (!card) return '';
+  return card.type === 'epos_platinum' ? 'EPOS黑卡' : 'ANA金卡';
+}
+
+/** 单色紧凑区块：4 行（无订单）/ +2 行每个订单 */
 function productBlock(item: ProductReportItem, cards: Record<CardId, CardConfig>): string {
   const p = item.product;
   const f = item.filtered;
-  const lines: string[] = [];
-  lines.push(`${colorEmoji(p.color)} ${p.colorZh}（${p.color}）`);
-
+  const emoji = colorEmoji(p.color);
   if (!f.best) {
-    lines.push('最高回收：暂无有效报价');
-    if (item.latest === null) lines.push('（尚无成功采集记录）');
-    return lines.join('\n');
+    return `${emoji} ${p.colorZh}：暂无有效报价`;
   }
-
   const best = f.best.price;
   const apple = p.applePrice;
-  lines.push(`最高回收：${yen(best)}`);
-  lines.push(`商家：${f.best.shopName}`);
-  lines.push(`第二：${quoteLine(f.second)}`);
-  lines.push(`第三：${quoteLine(f.third)}`);
-  lines.push(`一丁目：${quoteLine(f.ichimonme)}`);
-  lines.push(`现金毛差额：${yenSigned(best - apple)}/台（未扣运费等费用）`);
-  lines.push(cardLine(cards, apple));
-  lines.push(
-    `较上次：${diffText(best, item.prevBest)}｜较今早：${diffText(best, item.morningBest)}｜24h前：${diffText(best, item.best24hAgo)}`,
-  );
-  lines.push(
-    `报价更新：${formatIsoShort(f.best.updatedAt)}${item.dataAgeHours !== null ? `（数据采集于 ${item.dataAgeHours.toFixed(1)} 小时前）` : ''}`,
-  );
+  const lines: string[] = [];
+  lines.push(`${emoji} ${p.colorZh} ${yen(best)}（${f.best.shopName}）`);
+  const rank: string[] = [];
+  if (f.second) rank.push(`第二 ${yen(f.second.price)}`);
+  if (f.third) rank.push(`第三 ${yen(f.third.price)}`);
+  if (f.ichimonme) rank.push(`一丁目 ${yen(f.ichimonme.price)}`);
+  lines.push(`  ${rank.join('｜')}`);
 
-  if (f.colorDiscount) {
-    lines.push(
-      `⚠️ 检测到颜色减价提示 ${yenSigned(-f.colorDiscount.amount)}（是否已包含在报价中：未确认，未扣减；保守口径 ${yen(best - f.colorDiscount.amount)}）`,
-    );
+  // 无订单时展示两种卡的积分/里程估算（复用 calcCard，逻辑与订单区一致）
+  if (item.analyses.length === 0) {
+    const eposR = calcCard(apple, cards.epos);
+    const anaR = calcCard(apple, cards.ana);
+    lines.push(`  毛差 ${yenSigned(best - apple)}｜EPOS +${yen(eposR.pointsValueYen)}｜ANA里程 ≈${yen(anaR.milesValueYen)}`);
   }
+  lines.push(`  较上次 ${diffText(best, item.prevBest)}｜较今早 ${diffText(best, item.morningBest)}`);
+  const tail: string[] = [];
+  if (f.colorDiscount) {
+    tail.push(`⚠️减价 ${yenSigned(-f.colorDiscount.amount)} 未确认（保守 ${yen(best - f.colorDiscount.amount)}）`);
+  }
+  tail.push(`报价 ${formatIsoShort(f.best.updatedAt)}`);
+  lines.push(`  ${tail.join('｜')}`);
 
   for (const a of item.analyses) {
-    const cardLabel = cards[a.order.card]?.label ?? a.order.card;
     const pr = a.profit;
-    lines.push(`🧾 ${a.order.orderRef} ×${a.order.quantity}（${cardLabel}）`);
-    lines.push(`💴 购买：${yen(a.order.unitPrice)}/台`);
-    lines.push(`📉 现金毛差额：${yenSigned(pr.cashGrossPerUnit)}/台（未扣运费等费用）`);
-    lines.push(pr.feesKnown ? `🧮 预计净利润：${yenSigned(pr.cashNetPerUnit)}/台` : '🧮 预计净利润：费用未确认，尚无法确定');
-    const isAna = cards[a.order.card]?.type === 'ana_gold';
+    const cardName = cardShortLabel(cards[a.order.card]);
     const reversed = pr.card.notes.some((n) => n.includes('撤销'));
-    if (reversed) {
-      lines.push('💎 积分估值收益：已申请退货，积分/里程可能被撤销，按 ¥0 计');
-    } else if (pr.card.points > 0 && isAna) {
+    lines.push(`🧾 ${a.order.orderRef} ×${a.order.quantity} ${cardName}｜购买 ${yen(a.order.unitPrice)}`);
+    if (!pr.feesKnown) {
+      lines.push(`  毛差 ${yenSigned(pr.cashGrossPerUnit)}｜预计净利 未确认｜综合 未估算｜实际确认 暂无 ⚠️费用未确认`);
+    } else if (reversed) {
       lines.push(
-        `💎 积分估值收益：${pr.card.points.toLocaleString('en-US')} J-POINT → ${pr.card.miles.toLocaleString('en-US')}mi ≈ ${yen(pr.card.milesValueYen)}（估算，非现金）`,
+        `  毛差 ${yenSigned(pr.cashGrossPerUnit)}｜预计净利 ${yenSigned(pr.cashNetPerUnit)}｜积分估值 ¥0（已申请退货）｜综合 ${yenSigned(pr.comprehensiveNetPerUnit)}｜实际确认 ${yenSigned(pr.cashNetPerUnit)}`,
       );
-    } else if (pr.card.points > 0) {
-      lines.push(`💎 积分估值收益：${pr.card.points.toLocaleString('en-US')}pt ≈ ${yen(pr.card.pointsValueYen)}（估算，非现金）`);
+    } else {
+      const pts = pr.pointsValuePerUnit + pr.milesValuePerUnit;
+      lines.push(
+        `  毛差 ${yenSigned(pr.cashGrossPerUnit)}｜预计净利 ${yenSigned(pr.cashNetPerUnit)}｜积分估值 +${yen(pts)}｜综合 ${yenSigned(pr.comprehensiveNetPerUnit)}｜实际确认 ${yenSigned(pr.cashNetPerUnit)}`,
+      );
     }
-    if (pr.card.annualBonusPoints) {
-      lines.push(`🎁 EPOS年度奖励增量：+${pr.card.annualBonusPoints.toLocaleString('en-US')}pt（参考估算，不计入确定收益）`);
-    }
-    lines.push(
-      pr.feesKnown
-        ? `🔮 综合预计收益：${yenSigned(pr.comprehensiveNetPerUnit)}/台（估算）`
-        : '🔮 综合预计收益：费用未确认，暂无法估算',
-    );
-    lines.push(
-      pr.feesKnown && pr.cashNetPerUnit !== null
-        ? `✅ 实际确认收益（现金）：${yenSigned(pr.cashNetPerUnit)}/台`
-        : '✅ 实际确认收益：费用未确认，暂无确认收益',
-    );
-    if (!pr.feesKnown) lines.push('⚠️ 请补齐运费/交通费/手续费后再确认净利润与回本判定');
   }
   return lines.join('\n');
 }
@@ -143,10 +132,12 @@ function countdownBlock(analyses: OrderAnalysis[]): string | null {
   if (withDeadline.length === 0) return null;
   const lines: string[] = [SEP, '⏳ 退货倒计时'];
   for (const a of withDeadline) {
-    lines.push(`🧾 ${a.order.orderRef}｜${a.product.model} ${a.product.capacity} ${colorEmoji(a.product.color)}${a.product.colorZh} ×${a.order.quantity}`);
-    lines.push(`申请截止：${formatDateCn(a.deadline!.date)}${a.deadline!.estimated ? '（估算：收货+14天）' : '（官方确认）'}`);
-    if (a.suggestApplyDate) lines.push(`建议最迟申请：${formatDateCn(a.suggestApplyDate)}`);
-    if (a.daysLeft !== null) lines.push(`还剩：${a.daysLeft} 天`);
+    const d = a.deadline!;
+    const parts = [`🧾 ${a.order.orderRef} ${colorEmoji(a.product.color)}${a.product.colorZh}×${a.order.quantity}`];
+    parts.push(`截止 ${formatDateCn(d.date)}${d.estimated ? '（估算）' : '（官方）'}`);
+    if (a.suggestApplyDate) parts.push(`最迟申请 ${formatDateCn(a.suggestApplyDate)}`);
+    if (a.daysLeft !== null) parts.push(`剩 ${a.daysLeft} 天`);
+    lines.push(parts.join('｜'));
   }
   return lines.join('\n');
 }
@@ -155,13 +146,12 @@ function judgmentBlock(analyses: OrderAnalysis[], warnings: string[], now: Date)
   const lines: string[] = [SEP, '💡 当前判断'];
   if (analyses.length === 0) lines.push('（暂无持有中的订单）');
   for (const a of analyses) {
-    lines.push(`${a.suggestion.emoji} ${a.order.orderRef}：${a.suggestion.title}`);
-    for (const b of a.suggestion.bullets.slice(0, 2)) lines.push(`   ${b}`);
-    for (const w of a.suggestion.warnings) lines.push(`   ⚠️ ${w}`);
+    lines.push(`${a.suggestion.emoji} ${a.order.orderRef} ${a.suggestion.title}：${a.suggestion.bullets[0] ?? ''}`);
+    const w = a.suggestion.warnings[0];
+    if (w) lines.push(`   ⚠️ ${w}`);
   }
   for (const w of warnings) lines.push(`⚠️ ${w}`);
-  lines.push(SEP);
-  lines.push(`🔗 报价来源：買取X Open API（查询时间 ${formatJstDateTime(now)}）`);
+  lines.push(`🔗 買取X（${formatJstDateTime(now)} 查询）`);
   return lines.join('\n');
 }
 
@@ -209,7 +199,7 @@ export interface DailyReportArgs {
 export function buildDailyReport(args: DailyReportArgs): string[] {
   const { now, reportType, items, cards, quotaNote, extraWarnings } = args;
   const label = reportType === 'morning' ? '早间报告' : reportType === 'afternoon' ? '下午报告' : '监控报告';
-  const headerText = [`📱 iPhone買取套利监控 · ${label}`, SEP, `🕒 ${formatJstDateTime(now)}`].join('\n');
+  const headerText = `📱 買取监控·${label}｜🕒 ${formatJstDateTime(now)}`;
 
   // 按型号分组
   const byModel = new Map<string, ProductReportItem[]>();
@@ -224,7 +214,7 @@ export function buildDailyReport(args: DailyReportArgs): string[] {
   let headerUsed = false;
   for (const [modelKey, groupItems] of byModel) {
     const first = groupItems[0];
-    const modelHeader = [`📦 ${modelKey}`, `💴 Apple官网：${yen(first.product.applePrice)}（含税）`].join('\n');
+    const modelHeader = `📦 ${modelKey}｜官网 ${yen(first.product.applePrice)}`;
     const prefix = headerUsed ? '' : `${headerText}\n\n`;
     headerUsed = true;
     const colorBlocks = groupItems.map((item) => productBlock(item, cards));

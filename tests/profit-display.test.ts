@@ -117,13 +117,10 @@ test('日报订单区：费用未确认时四个口径分明，不出现确定�
     extraWarnings: [],
   });
   const text = messages.join('\n');
-  assert.match(text, /现金毛差额：\+¥5,200\/台（未扣运费等费用）/);
-  assert.match(text, /🧮 预计净利润：费用未确认，尚无法确定/);
-  assert.match(text, /🔮 综合预计收益：费用未确认，暂无法估算/);
-  assert.match(text, /✅ 实际确认收益：费用未确认，暂无确认收益/);
-  assert.match(text, /💎 积分估值收益：1,199pt ≈ ¥1,199（估算，非现金）/);
-  assert.doesNotMatch(text, /预计净利润：\+¥5,200/, '不得把毛差额当作确定净利润');
-  assert.doesNotMatch(text, /实际确认收益（现金）：\+¥5,200/);
+  assert.match(text, /🧾 DEMO-01 ×1 EPOS黑卡｜购买 ¥239,800/);
+  assert.match(text, /毛差 \+¥5,200｜预计净利 未确认｜综合 未估算｜实际确认 暂无 ⚠️费用未确认/);
+  assert.doesNotMatch(text, /预计净利 \+¥5,200/, '不得把毛差额当作确定净利润');
+  assert.doesNotMatch(text, /实际确认 \+¥5,200/);
 });
 
 test('日报订单区：费用已确认时显示预计净利润与实际确认收益', () => {
@@ -138,10 +135,8 @@ test('日报订单区：费用已确认时显示预计净利润与实际确认�
     extraWarnings: [],
   });
   const text = messages.join('\n');
-  assert.match(text, /现金毛差额：-¥4,800\/台（未扣运费等费用）/);
-  assert.match(text, /🧮 预计净利润：-¥4,800\/台/);
-  assert.match(text, /🔮 综合预计收益：-¥3,601\/台（估算）/);
-  assert.match(text, /✅ 实际确认收益（现金）：-¥4,800\/台/);
+  assert.match(text, /🧾 DEMO-01 ×1 EPOS黑卡｜购买 ¥239,800/);
+  assert.match(text, /毛差 -¥4,800｜预计净利 -¥4,800｜积分估值 \+¥1,199｜综合 -¥3,601｜实际确认 -¥4,800/);
   assert.doesNotMatch(text, /尚无法确定/);
 });
 
@@ -157,8 +152,8 @@ test('ANA 卡订单：积分估值按 J-POINT → 里程展示', () => {
     extraWarnings: [],
   });
   const text = messages.join('\n');
-  assert.match(text, /💎 积分估值收益：1,199 J-POINT → 2,398mi ≈ ¥4,796（估算，非现金）/);
-  assert.match(text, /🔮 综合预计收益：-¥4\/台（估算）/);
+  assert.match(text, /🧾 DEMO-01 ×1 ANA金卡｜购买 ¥239,800/);
+  assert.match(text, /毛差 -¥4,800｜预计净利 -¥4,800｜积分估值 \+¥4,796｜综合 -¥4｜实际确认 -¥4,800/);
 });
 
 test('已申请退货的订单：积分估值按 0 计并说明原因', () => {
@@ -173,6 +168,6 @@ test('已申请退货的订单：积分估值按 0 计并说明原因', () => {
     extraWarnings: [],
   });
   const text = messages.join('\n');
-  assert.match(text, /💎 积分估值收益：已申请退货，积分\/里程可能被撤销，按 ¥0 计/);
-  assert.match(text, /🔮 综合预计收益：-¥4,800\/台（估算）/);
+  assert.match(text, /🧾 DEMO-01 ×1 EPOS黑卡｜购买 ¥239,800/);
+  assert.match(text, /毛差 -¥4,800｜预计净利 -¥4,800｜积分估值 ¥0（已申请退货）｜综合 -¥4,800｜实际确认 -¥4,800/);
 });

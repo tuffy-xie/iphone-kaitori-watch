@@ -40,7 +40,7 @@ function makeItem(): ProductReportItem {
   };
 }
 
-test('日报包含所有必需区块', () => {
+test('日报包含所有必需区块（紧凑格式）', () => {
   const messages = buildDailyReport({
     now: new Date('2026-10-12T09:05:00+09:00'),
     reportType: 'morning',
@@ -51,36 +51,47 @@ test('日报包含所有必需区块', () => {
     extraWarnings: [],
   });
   const text = messages.join('\n\n@@@\n\n');
-  assert.match(text, /📱 iPhone買取套利监控 · 早间报告/);
-  assert.match(text, /🕒 2026\/10\/12 09:05 JST/);
-  assert.match(text, /📦 iPhone 18 Pro Max 256GB/);
-  assert.match(text, /💴 Apple官网：¥239,800/);
-  assert.match(text, /⚫ 黑色（ブラック）/);
-  assert.match(text, /最高回收：¥231,000/);
-  assert.match(text, /商家：買取ソムリエ/);
-  assert.match(text, /第二：¥229,500（買取商店）/);
-  assert.match(text, /一丁目：¥225,000（買取一丁目）/);
-  assert.match(text, /现金毛差额：-¥8,800\/台（未扣运费等费用）/);
-  assert.match(text, /🧾 IP18PM-BLK-01 ×1（EPOS Platinum（EPOS黑卡））/);
-  assert.match(text, /💴 购买：¥239,800\/台/);
-  assert.match(text, /📉 现金毛差额：-¥8,800\/台（未扣运费等费用）/);
-  assert.match(text, /🧮 预计净利润：-¥8,800\/台/);
-  assert.match(text, /💎 积分估值收益：1,199pt ≈ ¥1,199（估算，非现金）/);
-  assert.match(text, /🔮 综合预计收益：-¥7,601\/台（估算）/);
-  assert.match(text, /✅ 实际确认收益（现金）：-¥8,800\/台/);
-  assert.match(text, /EPOS：\+¥1,199/);
-  assert.match(text, /ANA里程：\+2,398（约 ¥4,796）/);
-  assert.match(text, /较上次：\+¥4,000/);
-  assert.match(text, /较今早：\+¥1,000/);
-  assert.match(text, /24h前：\+¥2,000/);
+  // 头部与型号（一行式）
+  assert.match(text, /📱 買取监控·早间报告｜🕒 2026\/10\/12 09:05 JST/);
+  assert.match(text, /📦 iPhone 18 Pro Max 256GB｜官网 ¥239,800/);
+  // 单色区块
+  assert.match(text, /⚫ 黑色 ¥231,000（買取ソムリエ）/);
+  assert.match(text, /第二 ¥229,500｜第三 ¥225,000｜一丁目 ¥225,000/);
+  assert.match(text, /较上次 \+¥4,000｜较今早 \+¥1,000/);
+  assert.match(text, /⚠️减价 -¥17,500 未确认（保守 ¥213,500）｜报价 10\/12 08:50/);
+  // 订单区：五口径一行
+  assert.match(text, /🧾 IP18PM-BLK-01 ×1 EPOS黑卡｜购买 ¥239,800/);
+  assert.match(text, /毛差 -¥8,800｜预计净利 -¥8,800｜积分估值 \+¥1,199｜综合 -¥7,601｜实际确认 -¥8,800/);
+  // 退货倒计时：一行
   assert.match(text, /⏳ 退货倒计时/);
-  assert.match(text, /10月18日（估算：收货\+14天）/);
-  assert.match(text, /建议最迟申请：10月17日/);
+  assert.match(text, /🧾 IP18PM-BLK-01 ⚫黑色×1｜截止 10月18日（估算）｜最迟申请 10月17日｜剩 6 天/);
+  // 判断与来源
   assert.match(text, /💡 当前判断/);
-  assert.match(text, /🔵 IP18PM-BLK-01：继续观察/);
-  assert.match(text, /未确认/);
-  assert.match(text, /🔗 报价来源：買取X Open API/);
+  assert.match(text, /🔵 IP18PM-BLK-01 继续观察：目前亏损 8,800 日元/);
+  assert.match(text, /🔗 買取X（2026\/10\/12 09:05 JST 查询）/);
+  // 旧冗长格式不得出现
+  assert.doesNotMatch(text, /最高回收：/);
+  assert.doesNotMatch(text, /（估算：收货\+14天）/);
   assert.ok(!text.includes('NaN'), '不得出现 NaN');
+  // 紧凑性：整个报告应控制在一屏以内
+  assert.ok(text.length < 1200, `报告过长: ${text.length} 字符`);
+});
+
+test('无订单时产品级展示 EPOS/ANA 积分里程估算', () => {
+  const item = makeItem();
+  item.analyses = [];
+  const messages = buildDailyReport({
+    now: new Date('2026-10-12T09:05:00+09:00'),
+    reportType: 'morning',
+    items: [item],
+    cards,
+    settings,
+    quotaNote: null,
+    extraWarnings: [],
+  });
+  const text = messages.join('\n');
+  assert.match(text, /毛差 -¥8,800｜EPOS \+¥1,199｜ANA里程 ≈¥4,796/);
+  assert.doesNotMatch(text, /🧾/, '无订单不显示订单区');
 });
 
 test('长报告自动分段且不超限', () => {
