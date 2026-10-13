@@ -312,11 +312,20 @@ export async function runMonitor(
       quotaNote: skipped.some((s) => s.reason.includes('额度')) ? msg.buildQuotaSkipNote(skipped.find((s) => s.reason.includes('额度'))!.reason) : null,
       extraWarnings: [...new Set(fetchWarnings)],
     });
+    let delivered = 0;
     for (const m of messages) {
-      if (opts.force) await notifier.send(m);
-      else await notifier.sendOnce(`report-${reportType}-${today}`, m);
+      if (opts.force) {
+        await notifier.send(m);
+        delivered++;
+      } else {
+        const sent = await notifier.sendOnce(`report-${reportType}-${today}`, m);
+        if (sent) delivered++;
+      }
     }
-    reportSent = true;
+    if (delivered === 0) {
+      console.log(`[去重] 今日${reportType === 'morning' ? '早间' : reportType === 'afternoon' ? '下午' : ''}报告已推送过，跳过（如需重发：workflow 输入 force=true）`);
+    }
+    reportSent = delivered > 0;
   }
 
   const cleanup = await runCleanupIfDue(db, settings, now);

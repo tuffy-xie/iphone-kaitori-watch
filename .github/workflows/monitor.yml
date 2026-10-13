@@ -27,6 +27,10 @@ on:
         description: 'order-upsert 模式专用：订单 JSON 数组（见 README「订单录入」）'
         type: string
         default: ''
+      force:
+        description: '强制推送（绕过去重：今日报告已发过也想重发时勾选）'
+        type: boolean
+        default: false
 
 # 与退货提醒工作流共用同一并发组：两个工作流串行执行，避免通知去重的检查-写入竞争
 concurrency:
@@ -61,6 +65,7 @@ jobs:
           DRY_RUN: ${{ (inputs.dry_run && 'true') || 'false' }}
           REPORT_TYPE: ${{ inputs.report_type || 'auto' }}
           ORDERS_JSON: ${{ inputs.orders_json }}
+          FORCE: ${{ (inputs.force && 'true') || 'false' }}
           # 定时触发的 cron 表达式（workflow_dispatch 时为空）与时区
           SCHEDULE_CRON: ${{ github.event.schedule }}
           SCHEDULE_TZ: Asia/Tokyo

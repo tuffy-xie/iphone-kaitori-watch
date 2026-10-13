@@ -126,7 +126,7 @@ async function main(): Promise<void> {
   loadEnvFile();
   const { mode, flags, bools } = parseArgs(process.argv.slice(2));
   const dryRun = bools['dry-run'] || envBool('DRY_RUN');
-  const force = bools.force === true;
+  const force = bools.force === true || envBool('FORCE');
 
   const settings = loadSettings();
   const productsFile = loadProductsFile();
