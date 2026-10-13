@@ -130,6 +130,7 @@ export async function runMonitor(
         // 真正耗尽检查（早/晚报允许部分采集，其余用库中报价）
         if ((await quota.remaining(today)) < 1) {
           skipped.push({ jan, reason: '每日额度已耗尽' });
+          console.log(`[跳过] ${product.colorZh} ${jan}: 買取X 每日额度已耗尽，使用库中最近报价`);
           continue;
         }
       try {
