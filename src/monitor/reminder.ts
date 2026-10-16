@@ -7,6 +7,7 @@ import type { Notifier } from '../notify/dedupe.ts';
 import * as msg from '../notify/messages.ts';
 import type { ProductReportItem } from '../notify/messages.ts';
 import { dueReminderThresholds, returnCountdown } from '../orders/return.ts';
+import { filterAndRank } from '../kaitorix/filter.ts';
 import { formatDateCn, todayJst } from '../util/time.ts';
 
 export interface ReminderDeps {
@@ -34,15 +35,24 @@ export async function sendReturnReminders(deps: ReminderDeps): Promise<number> {
     const cd = returnCountdown(o, deps.settings, today);
     if (!cd.deadline || cd.daysLeft === null) continue;
 
+    // 价格口径与报告/收益判定保持一致：聚焦模式用一丁目价（回退全店最高），全店模式用最高价
+    const focus = deps.settings.focusShopOnly;
     let best: { price: number; shopName: string; updatedAt: string | null } | null = null;
     const item = itemByJan.get(o.jan);
-    const itemBest = item ? item.filtered.best : null;
-    if (itemBest) {
-      best = { price: itemBest.price, shopName: itemBest.shopName, updatedAt: itemBest.updatedAt };
+    const itemQuote = item ? (focus ? (item.focusQuote ?? item.filtered.best) : item.filtered.best) : null;
+    if (itemQuote) {
+      best = { price: itemQuote.price, shopName: itemQuote.shopName, updatedAt: itemQuote.updatedAt };
     } else {
       const latest = await repo.getLatestValidQuotes(deps.db, o.jan);
-      const q = latest?.quotes[0] ?? null;
-      if (q) best = { price: q.price, shopName: q.shopName, updatedAt: q.updatedAt };
+      if (latest) {
+        const ranked = filterAndRank(latest.quotes, {
+          maxQuoteAgeHours: deps.settings.maxQuoteAgeHours,
+          now,
+          specialShopKeys: deps.settings.specialShops.kaitoriIchimonme,
+        });
+        const q = focus ? (ranked.ichimonme ?? ranked.best) : ranked.best;
+        if (q) best = { price: q.price, shopName: q.shopName, updatedAt: q.updatedAt };
+      }
     }
 
     const args = {
@@ -58,6 +68,7 @@ export async function sendReturnReminders(deps: ReminderDeps): Promise<number> {
       bestShop: best?.shopName ?? null,
       bestUpdatedAt: best?.updatedAt ?? null,
       thresholds: dueReminderThresholds(cd.daysLeft, deps.settings.returnReminderThresholdsDays),
+      priceLabel: focus ? '一丁目回收' : '最高回收',
     };
 
     // 阈值节点提醒（7/3/2/1/0 天，每个节点只发一次）

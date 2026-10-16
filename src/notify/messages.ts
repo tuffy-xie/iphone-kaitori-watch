@@ -337,8 +337,11 @@ export function buildReturnReminder(args: {
   bestShop: string | null;
   bestUpdatedAt: string | null;
   thresholds: number[];
+  /** 价格口径标签：聚焦模式传「一丁目回收」，全店模式传「最高回收」 */
+  priceLabel?: string;
 }): string {
   const urgency = args.daysLeft !== null && args.daysLeft <= 1 ? '🚨' : args.daysLeft !== null && args.daysLeft <= 3 ? '⚠️' : '⏳';
+  const priceLabel = args.priceLabel ?? '最高回收';
   const lines = [
     `${urgency} 退货倒计时提醒`,
     SEP,
@@ -353,7 +356,7 @@ export function buildReturnReminder(args: {
   }
   lines.push(SEP);
   if (args.bestPrice !== null) {
-    lines.push(`当前最高回收：${yen(args.bestPrice)}${args.bestShop ? `（${args.bestShop}）` : ''}`);
+    lines.push(`当前${priceLabel}：${yen(args.bestPrice)}${args.bestShop ? `（${args.bestShop}）` : ''}`);
     lines.push(`报价更新：${formatIsoShort(args.bestUpdatedAt)}`);
   } else {
     lines.push('当前无有效回收报价');

@@ -47,7 +47,8 @@ test('过滤 stopped/stale/无价格/过旧报价，并按价格降序排名', (
 });
 
 test('stopped 报价即使价格最高也不得作为最高报价（不得直接使用 max_price）', () => {
-  const r = filterAndRank(make(), { maxQuoteAgeHours: 72 });
+  // 必须显式传 now：否则按真实当前时间过滤，固定时间的测试数据会全部超过 72h 被滤掉（时间炸弹）
+  const r = filterAndRank(make(), { maxQuoteAgeHours: 72, now: new Date('2026-10-12T09:00:00+09:00') });
   assert.notEqual(r.best?.shopKey, 'stopshop');
   assert.ok(r.best!.price < 240000);
 });
