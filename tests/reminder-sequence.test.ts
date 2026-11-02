@@ -8,7 +8,8 @@ import { Notifier } from '../src/notify/dedupe.ts';
 import { sendReturnReminders } from '../src/monitor/reminder.ts';
 import { loadSettings, loadProductsFile } from '../src/config/load.ts';
 
-const settings = loadSettings();
+// 测试需显式开启：生产 settings.json 已关闭退货提醒（returnRemindersEnabled=false）
+const settings = { ...loadSettings(), returnRemindersEnabled: true };
 const { products } = loadProductsFile();
 
 async function sentKeysOn(db: Awaited<ReturnType<typeof createTestDb>>, notifier: Notifier, date: string): Promise<string[]> {
@@ -106,4 +107,24 @@ test('已出售/已退款的订单不再提醒', async () => {
   });
   const sent = await sentKeysOn(db, notifier, '2026-10-20');
   assert.deepEqual(sent, []);
+});
+
+test('总开关关闭时完全静音：不发送、不写去重表；重新开启可正常补发', async () => {
+  const db = await createTestDb();
+  const notifier = new Notifier(db, null, false);
+  await repo.upsertOrder(db, {
+    orderRef: 'SEQ-07', jan: '4549995734546', quantity: 1, unitPrice: 239800, card: 'epos',
+    receivedDate: '2026-10-01', status: 'holding', // 截止 10-15，10-08 剩 7 天 → 本应触发 d7
+  });
+  const off = { ...settings, returnRemindersEnabled: false };
+  const out = await captureLogs(async () => {
+    const sent = await sendReturnReminders({ db, settings: off, products, notifier, now: new Date('2026-10-08T10:00:00+09:00') });
+    assert.equal(sent, 0, '关闭后不得发送任何提醒');
+  });
+  assert.match(out, /returnRemindersEnabled=false/);
+  const rows = await db.query<{ event_key: string }>('SELECT event_key FROM notifications');
+  assert.equal(rows.length, 0, '关闭后不得写入去重记录');
+  // 重新开启后同日仍能正常补发（去重表未被污染）
+  const sent = await sendReturnReminders({ db, settings, products, notifier, now: new Date('2026-10-08T10:00:00+09:00') });
+  assert.equal(sent, 1, '重新开启后应补发 d7');
 });

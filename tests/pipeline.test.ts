@@ -11,7 +11,8 @@ import { KaitoriXClient } from '../src/kaitorix/client.ts';
 import * as repo from '../src/db/repo.ts';
 import { loadSettings, loadProductsFile, loadCardsFile } from '../src/config/load.ts';
 
-const settings = loadSettings();
+// 测试需显式开启：生产 settings.json 已关闭退货提醒（returnRemindersEnabled=false）
+const settings = { ...loadSettings(), returnRemindersEnabled: true };
 const { products } = loadProductsFile();
 const { cards } = loadCardsFile();
 

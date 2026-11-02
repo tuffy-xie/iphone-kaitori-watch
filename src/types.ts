@@ -65,6 +65,8 @@ export interface Settings {
   returnReminderThresholdsDays: number[];
   returnDeadlineDaysAfterReceipt: number;
   suggestApplyDaysBeforeDeadline: number;
+  /** 是否通过 Telegram 发送退货倒计时提醒（false = 完全静音；日报中的倒计时仍保留） */
+  returnRemindersEnabled: boolean;
   priceAlertThresholdYen: number;
   rawDataRetentionDays: number;
   maxQuoteAgeHours: number;

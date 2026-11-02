@@ -11,6 +11,7 @@ const DEFAULTS: Settings = {
   returnReminderThresholdsDays: [7, 3, 2, 1, 0],
   returnDeadlineDaysAfterReceipt: 14,
   suggestApplyDaysBeforeDeadline: 1,
+  returnRemindersEnabled: true,
   priceAlertThresholdYen: 2000,
   rawDataRetentionDays: 29,
   maxQuoteAgeHours: 72,

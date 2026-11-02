@@ -21,6 +21,10 @@ export interface ReminderDeps {
 }
 
 export async function sendReturnReminders(deps: ReminderDeps): Promise<number> {
+  if (!deps.settings.returnRemindersEnabled) {
+    console.log('[退货提醒] 已在 settings.json 关闭（returnRemindersEnabled=false），本次不发送任何提醒');
+    return 0;
+  }
   const now = deps.now ?? new Date();
   const today = todayJst(now);
   const orders = await repo.listHeldOrders(deps.db);

@@ -1,12 +1,15 @@
 name: iphone-kaitori-watch · 退货提醒（独立）
 
 on:
-  schedule:
-    # JST 每天 10:00 / 22:00
-    # 独立于监控工作流：完全不调用買取X API，只读数据库，
-    # 因此即使报价采集失败/额度耗尽，退货截止提醒也一定会发出。
-    - cron: '0 10,22 * * *'
-      timezone: Asia/Tokyo
+  # ┌────────────────────────────────────────────────────────────────┐
+  # │ 定时已停用（2026-11-03 用户要求：退货提醒太多，全部静音）           │
+  # │ 同时 settings.json 的 returnRemindersEnabled 已设为 false，        │
+  # │ 即使手动触发或监控流程调用也不会发送任何退货提醒。                  │
+  # │ 需要恢复：把下面 3 行注释去掉 + settings.json 改 returnRemindersEnabled=true │
+  # └────────────────────────────────────────────────────────────────┘
+  # schedule:
+  #   - cron: '0 10,22 * * *'
+  #     timezone: Asia/Tokyo
   workflow_dispatch:
     inputs:
       dry_run:
