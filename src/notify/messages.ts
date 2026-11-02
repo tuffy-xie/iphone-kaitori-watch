@@ -154,7 +154,7 @@ function countdownBlock(analyses: OrderAnalysis[]): string | null {
     const parts = [`🧾 ${a.order.orderRef} ${colorEmoji(a.product.color)}${a.product.colorZh}×${a.order.quantity}`];
     parts.push(`截止 ${formatDateCn(d.date)}${d.estimated ? '（估算）' : '（官方）'}`);
     if (a.suggestApplyDate) parts.push(`最迟申请 ${formatDateCn(a.suggestApplyDate)}`);
-    if (a.daysLeft !== null) parts.push(`剩 ${a.daysLeft} 天`);
+    if (a.daysLeft !== null) parts.push(a.daysLeft < 0 ? `已过期 ${-a.daysLeft} 天` : `剩 ${a.daysLeft} 天`);
     lines.push(parts.join('｜'));
   }
   return lines.join('\n');
